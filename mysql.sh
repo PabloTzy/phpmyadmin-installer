@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define variables
-DB_USER="admindb"
+DB_USER="dbadmin"
 DB_PASSWORD="admin"
 MYSQL_CONF="/etc/mysql/mysql.conf.d/mysqld.cnf"
 
