@@ -34,5 +34,7 @@ echo "User '$DB_USER' created with root-like privileges."
 echo "You can now access MySQL remotely using the following credentials:"
 echo "Username: $DB_USER"
 echo "Password: $DB_PASSWORD"
+echo "Database Server IP: 159.223.57.24"
+echo "Port: 3306"
 
 echo "MySQL has been configured to accept connections from external IPs."
