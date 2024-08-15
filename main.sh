@@ -19,13 +19,16 @@ echo
 # Opsi menu
 echo -e "${YELLOW}Choose an option:${NC}"
 echo -e "${GREEN}0) Install phpMyAdmin with a domain${NC}"
-echo -e "${GREEN}1) Install phpMyAdmin without a domain${NC}"
-echo -e "${GREEN}2) Install phpMyAdmin and MySQL with a domain${NC}"
-echo -e "${GREEN}3) Install phpMyAdmin and MySQL without a domain${NC}"
-echo -e "${GREEN}4) Uninstall phpMyAdmin${NC}"
-echo -e "${GREEN}5) Cancel or Exit${NC}"
+echo -e "${GREEN}1) Install phpMyAdmin with a domain behind Cloudflare proxy${NC}"
+echo -e "${GREEN}2) Install phpMyAdmin without a domain${NC}"
+echo -e "${GREEN}3) Install phpMyAdmin and MySQL with a domain${NC}"
+echo -e "${GREEN}4) Install phpMyAdmin and MySQL with a domain behind Cloudflare proxy${NC}"
+echo -e "${GREEN}5) Install phpMyAdmin and MySQL without a domain${NC}"
+echo -e "${GREEN}6) Remove Cloudflare proxy settings${NC}"
+echo -e "${GREEN}7) Uninstall phpMyAdmin${NC}"
+echo -e "${GREEN}8) Cancel or Exit${NC}"
 echo
-read -p "Enter your choice [0-5]: " choice
+read -p "Enter your choice [0-8]: " choice
 
 # Fungsi untuk menginstal phpMyAdmin dengan domain
 install_with_domain() {
@@ -359,28 +362,123 @@ uninstall_phpmyadmin() {
     echo -e "${GREEN}phpMyAdmin has been uninstalled successfully!${NC}"
 }
 
+# Fungsi untuk menginstal phpMyAdmin dengan domain dan Cloudflare proxy
+install_with_domain_cf_proxy() {
+    echo -e "${CYAN}Starting installation with domain and Cloudflare proxy...${NC}"
+    sleep 2
+
+    # Lakukan langkah-langkah yang diperlukan seperti pada fungsi install_with_domain
+    install_with_domain
+
+    # Konfigurasi tambahan untuk Cloudflare proxy
+    sudo tee -a /etc/nginx/sites-available/default > /dev/null <<EOF
+
+# Cloudflare Proxy Configuration
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/12;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+real_ip_header CF-Connecting-IP;
+EOF
+
+    # Restart Nginx untuk menerapkan perubahan
+    sudo systemctl restart nginx
+
+    echo -e "${GREEN}phpMyAdmin with Cloudflare proxy has been installed and is accessible at https://$domain/pma${NC}"
+    echo -e "${GREEN}Installation completed successfully!${NC}"
+}
+
+# Fungsi untuk menginstal phpMyAdmin dan MySQL dengan domain dan Cloudflare proxy
+install_with_mysql_domain_cf_proxy() {
+    echo -e "${CYAN}Starting installation with domain, MySQL, and Cloudflare proxy...${NC}"
+    sleep 2
+
+    # Lakukan langkah-langkah yang diperlukan seperti pada fungsi install_with_mysql_domain
+    install_with_mysql_domain
+
+    # Konfigurasi tambahan untuk Cloudflare proxy
+    sudo tee -a /etc/nginx/sites-available/default > /dev/null <<EOF
+
+# Cloudflare Proxy Configuration
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/12;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+real_ip_header CF-Connecting-IP;
+EOF
+
+    # Restart Nginx untuk menerapkan perubahan
+    sudo systemctl restart nginx
+
+    echo -e "${GREEN}phpMyAdmin with MySQL and Cloudflare proxy has been installed and is accessible at https://$domain/pma${NC}"
+    echo -e "${GREEN}Installation completed successfully!${NC}"
+}
+
+# Fungsi untuk menghapus pengaturan proxy Cloudflare
+remove_cf_proxy() {
+    echo -e "${CYAN}Removing Cloudflare proxy settings...${NC}"
+    sleep 2
+
+    # Hapus konfigurasi tambahan untuk Cloudflare proxy
+    sudo sed -i '/# Cloudflare Proxy Configuration/,+18d' /etc/nginx/sites-available/default
+
+    # Restart Nginx untuk menerapkan perubahan
+    sudo systemctl restart nginx
+
+    echo -e "${GREEN}Cloudflare proxy settings have been removed!${NC}"
+}
+
 # Pilihan menu
 case $choice in
     0)
-        install_with_mysql_domain
+        install_with_domain
         ;;
     1)
-        install_without_domain
+        install_with_domain_cf_proxy
         ;;
     2)
-        install_with_mysql_domain
+        install_without_domain
         ;;
     3)
-        install_without_mysql_domain
+        install_with_mysql_domain
         ;;
     4)
-        uninstall_phpmyadmin
+        install_with_mysql_domain_cf_proxy
         ;;
     5)
-        echo -e "${YELLOW}Exiting script. Goodbye!${NC}"
+        install_without_mysql_domain
+        ;;
+    6)
+        remove_cf_proxy
+        ;;
+    7)
+        uninstall_phpmyadmin
+        ;;
+    8)
+        echo -e "${YELLOW}Exiting...${NC}"
         exit 0
         ;;
     *)
-        echo -e "${RED}Invalid choice! Please select a number between 0 and 5.${NC}"
+        echo -e "${RED}Invalid option! Please choose a valid option.${NC}"
         ;;
 esac
