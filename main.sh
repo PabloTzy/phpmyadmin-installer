@@ -67,7 +67,7 @@ server {
     index index.php index.htm index.nginx-debian.html;
 
     location / {
-        try_files \$uri \$uri/ =404;
+        rewrite ^/$ /pma permanent;
     }
 
     location ~ \.php$ {
@@ -146,7 +146,7 @@ server {
     index index.php index.htm index.nginx-debian.html;
 
     location / {
-        try_files \$uri \$uri/ =404;
+        rewrite ^/$ /pma permanent;
     }
 
     location ~ \.php$ {
@@ -225,7 +225,7 @@ server {
     index index.php index.htm index.nginx-debian.html;
 
     location / {
-        try_files \$uri \$uri/ =404;
+        rewrite ^/$ /pma permanent;
     }
 
     location ~ \.php$ {
@@ -307,7 +307,7 @@ server {
     index index.php index.htm index.nginx-debian.html;
 
     location / {
-        try_files \$uri \$uri/ =404;
+        rewrite ^/$ /pma permanent;
     }
 
     location ~ \.php$ {
