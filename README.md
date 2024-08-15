@@ -1,4 +1,3 @@
-```markdown
 # phpMyAdmin Installer
 
 ## Description
@@ -25,10 +24,9 @@ Ensure you have root or sudo access to your server and that `curl` is installed.
 1. **Download and Run the Script**
 
    To start the installation, execute the following command:
-   ```
+
    ```bash
    bash <(curl -s https://raw.githubusercontent.com/PabloTzy/phpmyadmin-installer/main/main.sh)
-```
 
 2. **Follow the Menu Options**
 
@@ -82,5 +80,5 @@ This script is licensed under the [MIT License](LICENSE).
 
 Thank you for using the phpMyAdmin Installer by PabloNetwork. We hope this script simplifies your server management!
 
-```
+
 Feel free to modify or expand on any sections as needed for your specific use case.
