@@ -1,40 +1,37 @@
 #!/bin/bash
 
-# Define variables
-DB_USER="dbadmin"
-DB_PASSWORD="admin"
-MYSQL_CONF="/etc/mysql/mysql.conf.d/mysqld.cnf"
+# Ubah bind-address di file konfigurasi MySQL
+MYSQL_CONFIG_FILE="/etc/mysql/my.cnf"
 
-# Check if script is run as root
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run this script as root."
+if [ ! -f "$MYSQL_CONFIG_FILE" ]; then
+  MYSQL_CONFIG_FILE="/etc/mysql/mysql.conf.d/mysqld.cnf"
+fi
+
+if [ -f "$MYSQL_CONFIG_FILE" ]; then
+  sudo sed -i 's/bind-address\s*=.*127.0.0.1/bind-address = 0.0.0.0/' "$MYSQL_CONFIG_FILE"
+  echo "Konfigurasi MySQL diubah: bind-address sekarang 0.0.0.0."
+else
+  echo "File konfigurasi MySQL tidak ditemukan."
   exit 1
 fi
 
-# Allow MySQL to listen on all IP addresses
-echo "Updating MySQL configuration to listen on all IP addresses..."
-if ! grep -q "^bind-address" "$MYSQL_CONF"; then
-  echo "bind-address = 0.0.0.0" >> "$MYSQL_CONF"
+# Restart layanan MySQL untuk menerapkan perubahan
+sudo systemctl restart mysql
+echo "Layanan MySQL di-restart."
+
+# Membuka port 3306 jika belum terbuka
+if sudo ufw status | grep -q "3306.*DENY"; then
+  sudo ufw allow 3306
+  echo "Port 3306 dibuka di firewall."
 else
-  sed -i 's/^bind-address.*/bind-address = 0.0.0.0/' "$MYSQL_CONF"
+  echo "Port 3306 sudah terbuka di firewall."
 fi
 
-# Restart MySQL to apply configuration changes
-echo "Restarting MySQL service..."
-systemctl restart mysql
+# Login ke MySQL sebagai root dan membuat user 'admindb'
+mysql -u root -p -e "
+CREATE USER 'admindb'@'%' IDENTIFIED BY 'admin';
+GRANT ALL PRIVILEGES ON *.* TO 'admindb'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+"
 
-# Create a MySQL user with root-like privileges
-echo "Creating MySQL user '$DB_USER' with root-like privileges..."
-mysql -u root -e "CREATE USER '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO '$DB_USER'@'%' WITH GRANT OPTION;"
-mysql -u root -e "FLUSH PRIVILEGES;"
-
-# Display user and password
-echo "User '$DB_USER' created with root-like privileges."
-echo "You can now access MySQL remotely using the following credentials:"
-echo "Username: $DB_USER"
-echo "Password: $DB_PASSWORD"
-echo "Database Server IP: 159.223.57.24"
-echo "Port: 3306"
-
-echo "MySQL has been configured to accept connections from external IPs."
+echo "User 'admindb' dengan akses root telah berhasil dibuat."
