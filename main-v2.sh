@@ -11,7 +11,7 @@ read -p "Masukkan pilihan Anda [1/2]: " opsi
 
 # Update package lists dan install dependencies
 sudo apt update
-sudo apt install -y nginx mysql-server php8.1-fpm php8.1-mysql wget unzip
+sudo apt install -y php8.1-fpm wget unzip
 
 # Buat direktori untuk phpMyAdmin
 mkdir -p /var/www/phpmyadmin/tmp && cd /var/www/phpmyadmin
