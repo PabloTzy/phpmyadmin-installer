@@ -1,56 +1,41 @@
 #!/bin/bash
 
-# Pastikan dijalankan sebagai root
-if [ "$EUID" -ne 0 ]; then
-    echo "Mohon jalankan skrip ini sebagai root."
-    exit 1
-fi
+# Pastikan domain diinput oleh user
+read -p "Masukkan domain Anda (contoh: domainanda.com): " domain
 
-# Menu pilihan operasi
-echo "======================================"
-echo "Skrip Install/Uninstall phpMyAdmin"
-echo "======================================"
-echo "1. Install phpMyAdmin"
-echo "2. Uninstall phpMyAdmin"
-echo "======================================"
-read -p "Pilih operasi [1/2]: " operasi
+# Pilihan HTTPS atau HTTP
+echo "Pilih opsi koneksi:"
+echo "1. HTTPS (Let's Encrypt)"
+echo "2. HTTP (tanpa SSL)"
+read -p "Masukkan pilihan Anda [1/2]: " opsi
 
-# Fungsi untuk menginstal phpMyAdmin
-install_phpmyadmin() {
-    # Input domain
-    read -p "Masukkan domain Anda (contoh: domainanda.com): " domain
+# Update package lists dan install dependencies
+sudo apt update
+sudo apt install -y php8.1-fpm wget unzip
 
-    if [ -z "$domain" ]; then
-        echo "Domain tidak boleh kosong. Proses dihentikan."
-        exit 1
-    fi
+# Buat direktori untuk phpMyAdmin
+mkdir -p /var/www/phpmyadmin/tmp && cd /var/www/phpmyadmin
 
-    # Pilihan HTTPS atau HTTP
-    echo "Pilih opsi koneksi:"
-    echo "1. HTTPS (Let's Encrypt)"
-    echo "2. HTTP (tanpa SSL)"
-    read -p "Masukkan pilihan Anda [1/2]: " opsi
+# Unduh dan ekstrak phpMyAdmin
+wget https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-english.tar.gz
+tar xvzf phpMyAdmin-latest-english.tar.gz
+mv phpMyAdmin-*-english/* /var/www/phpmyadmin
+rm phpMyAdmin-latest-english.tar.gz
 
-    # Update dan install dependencies
-    apt update
-    apt install -y php8.1-fpm wget unzip nginx certbot python3-certbot-nginx
+# Ubah kepemilikan dan izin
+chown -R www-data:www-data /var/www/phpmyadmin
+mkdir /var/www/phpmyadmin/config
+chmod o+rw /var/www/phpmyadmin/config
+cp /var/www/phpmyadmin/config.sample.inc.php /var/www/phpmyadmin/config/config.inc.php
+chmod o+w /var/www/phpmyadmin/config/config.inc.php
 
-    # Unduh dan instal phpMyAdmin
-    mkdir -p /var/www/phpmyadmin/tmp && cd /var/www/phpmyadmin
-    wget https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-english.tar.gz
-    tar xvzf phpMyAdmin-latest-english.tar.gz
-    mv phpMyAdmin-*-english/* /var/www/phpmyadmin
-    rm -rf phpMyAdmin-latest-english*
+# Konfigurasi Nginx berdasarkan pilihan HTTP atau HTTPS
+if [ "$opsi" -eq 1 ]; then
+    # Install Certbot jika memilih HTTPS
+    sudo apt install -y certbot python3-certbot-nginx
 
-    # Ubah izin direktori
-    chown -R www-data:www-data /var/www/phpmyadmin
-    mkdir /var/www/phpmyadmin/config
-    chmod o+rw /var/www/phpmyadmin/config
-
-    # Konfigurasi Nginx
-    if [ "$opsi" -eq 1 ]; then
-        # HTTPS
-        cat <<EOL > /etc/nginx/sites-available/phpmyadmin.conf
+    # Konfigurasi Nginx dengan HTTPS
+    cat <<EOL | sudo tee /etc/nginx/sites-available/phpmyadmin.conf
 server {
     listen 80;
     server_name $domain;
@@ -64,25 +49,58 @@ server {
     root /var/www/phpmyadmin;
     index index.php;
 
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+    sendfile off;
+
     ssl_certificate /etc/letsencrypt/live/$domain/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$domain/privkey.pem;
+    ssl_session_cache shared:SSL:10m;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256';
+    ssl_prefer_server_ciphers on;
+
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Robots-Tag none;
+    add_header Content-Security-Policy "frame-ancestors 'self'";
+    add_header X-Frame-Options DENY;
+    add_header Referrer-Policy same-origin;
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
     location ~ \.php\$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
         fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_index index.php;
         include fastcgi_params;
+        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_intercept_errors off;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 4 16k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.ht {
+        deny all;
     }
 }
 EOL
-        # Install SSL
-        certbot --nginx -d $domain --non-interactive --agree-tos --email admin@$domain
-    elif [ "$opsi" -eq 2 ]; then
-        # HTTP
-        cat <<EOL > /etc/nginx/sites-available/phpmyadmin.conf
+
+    # Aktifkan konfigurasi Nginx dan jalankan Certbot untuk HTTPS
+    sudo certbot --nginx -d $domain --non-interactive --agree-tos --email admin@$domain
+    sudo ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
+    sudo systemctl restart nginx
+
+elif [ "$opsi" -eq 2 ]; then
+    # Konfigurasi Nginx tanpa HTTPS
+    cat <<EOL | sudo tee /etc/nginx/sites-available/phpmyadmin.conf
 server {
     listen 80;
     server_name $domain;
@@ -90,88 +108,49 @@ server {
     root /var/www/phpmyadmin;
     index index.php;
 
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+    sendfile off;
+
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Robots-Tag none;
+    add_header Content-Security-Policy "frame-ancestors 'self'";
+    add_header X-Frame-Options DENY;
+    add_header Referrer-Policy same-origin;
+
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
     location ~ \.php\$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
         fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_index index.php;
         include fastcgi_params;
+        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_intercept_errors off;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 4 16k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.ht {
+        deny all;
     }
 }
 EOL
-    else
-        echo "Pilihan tidak valid. Proses dihentikan."
-        exit 1
-    fi
 
-    ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/
-    systemctl restart nginx
+    # Aktifkan konfigurasi Nginx tanpa SSL
+    sudo ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
+    sudo systemctl restart nginx
+else
+    echo "Pilihan tidak valid, proses dihentikan."
+    exit 1
+fi
 
-    echo "phpMyAdmin berhasil diinstal untuk domain $domain."
-}
-
-# Fungsi untuk menghapus phpMyAdmin
-uninstall_phpmyadmin() {
-    read -p "Masukkan domain Anda (contoh: domainanda.com): " domain
-
-    if [ -z "$domain" ]; then
-        echo "Domain tidak boleh kosong. Proses dihentikan."
-        exit 1
-    fi
-
-    echo "Menghapus konfigurasi phpMyAdmin untuk domain: $domain..."
-
-    # Hapus direktori phpMyAdmin
-    if [ -d "/var/www/phpmyadmin" ]; then
-        rm -rf /var/www/phpmyadmin
-        echo "Direktori /var/www/phpmyadmin berhasil dihapus."
-    else
-        echo "Direktori /var/www/phpmyadmin tidak ditemukan."
-    fi
-
-    # Hapus konfigurasi Nginx
-    if [ -f "/etc/nginx/sites-available/phpmyadmin.conf" ]; then
-        rm -f /etc/nginx/sites-available/phpmyadmin.conf
-        rm -f "/etc/nginx/sites-enabled/phpmyadmin.conf"
-        echo "Konfigurasi Nginx untuk phpMyAdmin berhasil dihapus."
-    fi
-
-    # Restart Nginx
-    systemctl restart nginx
-
-    # Hapus sertifikat SSL
-    if [ -d "/etc/letsencrypt/live/$domain" ]; then
-        certbot delete --cert-name "$domain"
-        echo "Sertifikat SSL untuk domain $domain berhasil dihapus."
-    else
-        echo "Sertifikat SSL untuk domain $domain tidak ditemukan."
-    fi
-
-    # Hapus paket-paket
-    read -p "Apakah Anda ingin menghapus paket phpMyAdmin dan dependencies? [y/n]: " hapus_paket
-    if [[ "$hapus_paket" == "y" || "$hapus_paket" == "Y" ]]; then
-        apt purge -y phpmyadmin php8.1-fpm wget unzip
-        apt autoremove -y
-        echo "Paket phpMyAdmin dan dependencies berhasil dihapus."
-    else
-        echo "Paket phpMyAdmin tidak dihapus."
-    fi
-
-    echo "phpMyAdmin berhasil dihapus dari server."
-}
-
-# Eksekusi pilihan operasi
-case "$operasi" in
-    1)
-        install_phpmyadmin
-        ;;
-    2)
-        uninstall_phpmyadmin
-        ;;
-    *)
-        echo "Pilihan tidak valid. Proses dihentikan."
-        exit 1
-        ;;
-esac
+echo "phpMyAdmin setup completed!"
