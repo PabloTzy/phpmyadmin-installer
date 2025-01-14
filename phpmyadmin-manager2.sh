@@ -5,22 +5,24 @@ install_phpmyadmin() {
     # Meminta input domain
     read -p "Masukkan domain untuk phpMyAdmin: " DOMAIN
 
+    # Memeriksa apakah domain sudah terpasang SSL
+    if ! certbot certificates | grep -q "$DOMAIN"; then
+        echo "Sertifikat SSL untuk domain $DOMAIN belum ada, menginstal Certbot..."
+        apt update && apt install -y certbot python3-certbot-nginx
+        certbot certonly --standalone -d $DOMAIN
+    fi
+
     # Instalasi phpMyAdmin
     echo "Menginstall phpMyAdmin..."
-    mkdir /var/www/phpmyadmin && mkdir /var/www/phpmyadmin/tmp/ && cd /var/www/phpmyadmin
+    mkdir -p /var/www/phpmyadmin/tmp/ && cd /var/www/phpmyadmin
     wget https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-english.tar.gz
     tar xvzf phpMyAdmin-latest-english.tar.gz
     mv /var/www/phpmyadmin/phpMyAdmin-*-english/* /var/www/phpmyadmin
     chown -R www-data:www-data *
-    mkdir config
+    mkdir -p config
     chmod o+rw config
     cp config.sample.inc.php config/config.inc.php
     chmod o+w config/config.inc.php
-
-    # Instalasi Certbot dan sertifikat SSL
-    echo "Menginstal Certbot dan mengatur SSL untuk domain..."
-    apt update && apt install -y certbot python3-certbot-nginx
-    certbot certonly --standalone -d $DOMAIN
 
     # Konfigurasi Nginx
     echo "Membuat konfigurasi Nginx..."
@@ -38,7 +40,7 @@ server {
     root /var/www/phpmyadmin;
     index index.php;
 
-    # allow larger file uploads and longer script runtimes
+    # Allow larger file uploads and longer script runtimes
     client_max_body_size 100m;
     client_body_timeout 120s;
 
@@ -87,8 +89,8 @@ server {
 EOL
 
     # Mengaktifkan konfigurasi dan restart Nginx
-    sudo ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
-    
+    ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
+    systemctl restart nginx
 
     # Membersihkan direktori config
     cp /var/www/phpmyadmin/config/config.inc.php /var/www/phpmyadmin
@@ -110,6 +112,8 @@ uninstall_phpmyadmin() {
 
 # Menu utama
 echo "Pilih opsi:"
+echo "1. Instalasi phpMyAdmin"
+echo "2. Hapus phpMyAdmin"
 read -p "Pilih opsi: " CHOICE
 
 case $CHOICE in
