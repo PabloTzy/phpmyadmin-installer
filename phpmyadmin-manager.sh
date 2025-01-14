@@ -20,7 +20,8 @@ install_phpmyadmin() {
     # Instalasi Certbot dan sertifikat SSL
     echo "Menginstal Certbot dan mengatur SSL untuk domain..."
     apt update && apt install -y certbot python3-certbot-nginx
-    certbot --nginx -d $DOMAIN
+    certbot certonly --standalone -d $DOMAIN
+    1
 
     # Konfigurasi Nginx
     echo "Membuat konfigurasi Nginx..."
@@ -65,7 +66,7 @@ server {
 
     location ~ \.php\$ {
         fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
