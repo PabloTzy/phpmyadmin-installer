@@ -8,6 +8,7 @@ install_phpmyadmin() {
     # Memeriksa apakah domain sudah terpasang SSL
     if ! certbot certificates | grep -q "$DOMAIN"; then
         echo "Sertifikat SSL untuk domain $DOMAIN belum ada, menginstal Certbot..."
+        systemctl stop nginx
         apt update && apt install -y certbot python3-certbot-nginx
         certbot certonly --standalone -d $DOMAIN
     fi
@@ -90,7 +91,7 @@ EOL
 
     # Mengaktifkan konfigurasi dan restart Nginx
     ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
-    systemctl restart nginx
+    
 
     # Membersihkan direktori config
     cp /var/www/phpmyadmin/config/config.inc.php /var/www/phpmyadmin
@@ -114,7 +115,8 @@ uninstall_phpmyadmin() {
 echo "Pilih opsi:"
 echo "1. Instalasi phpMyAdmin"
 echo "2. Hapus phpMyAdmin"
-read -p "Pilih opsi: " CHOICE
+echo "3. Keluar"
+read -p "Pilih opsi [1/2/3]: " CHOICE
 
 case $CHOICE in
     1)
@@ -123,7 +125,12 @@ case $CHOICE in
     2)
         uninstall_phpmyadmin
         ;;
+    3)
+        echo "Keluar dari program."
+        exit 0
+        ;;
     *)
-        echo "Pilihan tidak valid."
+        echo "Pilihan tidak valid. Program keluar."
+        exit 1
         ;;
 esac
