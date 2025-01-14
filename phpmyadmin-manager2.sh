@@ -5,25 +5,23 @@ install_phpmyadmin() {
     # Meminta input domain
     read -p "Masukkan domain untuk phpMyAdmin: " DOMAIN
 
-    # Memeriksa apakah domain sudah terpasang SSL
-    if ! certbot certificates | grep -q "$DOMAIN"; then
-        echo "Sertifikat SSL untuk domain $DOMAIN belum ada, menginstal Certbot..."
-        systemctl stop nginx
-        apt update && apt install -y certbot python3-certbot-nginx
-        certbot certonly --standalone -d $DOMAIN
-    fi
-
     # Instalasi phpMyAdmin
     echo "Menginstall phpMyAdmin..."
-    mkdir -p /var/www/phpmyadmin/tmp/ && cd /var/www/phpmyadmin
+    mkdir /var/www/phpmyadmin && mkdir /var/www/phpmyadmin/tmp/ && cd /var/www/phpmyadmin
     wget https://www.phpmyadmin.net/downloads/phpMyAdmin-latest-english.tar.gz
     tar xvzf phpMyAdmin-latest-english.tar.gz
     mv /var/www/phpmyadmin/phpMyAdmin-*-english/* /var/www/phpmyadmin
     chown -R www-data:www-data *
-    mkdir -p config
+    mkdir config
     chmod o+rw config
     cp config.sample.inc.php config/config.inc.php
     chmod o+w config/config.inc.php
+
+    # Instalasi Certbot dan sertifikat SSL
+    echo "Menginstal Certbot dan mengatur SSL untuk domain..."
+    systemctl stop nginx
+    apt update && apt install -y certbot python3-certbot-nginx
+    certbot --nginx -d $DOMAIN
 
     # Konfigurasi Nginx
     echo "Membuat konfigurasi Nginx..."
@@ -41,7 +39,7 @@ server {
     root /var/www/phpmyadmin;
     index index.php;
 
-    # Allow larger file uploads and longer script runtimes
+    # allow larger file uploads and longer script runtimes
     client_max_body_size 100m;
     client_body_timeout 120s;
 
@@ -68,7 +66,7 @@ server {
 
     location ~ \.php\$ {
         fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
@@ -90,7 +88,7 @@ server {
 EOL
 
     # Mengaktifkan konfigurasi dan restart Nginx
-    ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
+    sudo ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
     
 
     # Membersihkan direktori config
@@ -113,10 +111,9 @@ uninstall_phpmyadmin() {
 
 # Menu utama
 echo "Pilih opsi:"
-echo "1. Instalasi phpMyAdmin"
-echo "2. Hapus phpMyAdmin"
-echo "3. Keluar"
-read -p "Pilih opsi [1/2/3]: " CHOICE
+echo "1. Install phpMyAdmin"
+echo "2. Uninstall phpMyAdmin"
+read -p "Masukkan pilihan (1/2): " CHOICE
 
 case $CHOICE in
     1)
@@ -125,12 +122,7 @@ case $CHOICE in
     2)
         uninstall_phpmyadmin
         ;;
-    3)
-        echo "Keluar dari program."
-        exit 0
-        ;;
     *)
-        echo "Pilihan tidak valid. Program keluar."
-        exit 1
+        echo "Pilihan tidak valid."
         ;;
 esac
