@@ -89,7 +89,7 @@ EOL
 
     # Mengaktifkan konfigurasi dan restart Nginx
     sudo ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
-    systemctl restart nginx
+    
 
     # Membersihkan direktori config
     cp /var/www/phpmyadmin/config/config.inc.php /var/www/phpmyadmin
