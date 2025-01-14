@@ -21,7 +21,7 @@ install_phpmyadmin() {
     echo "Menginstal Certbot dan mengatur SSL untuk domain..."
     systemctl stop nginx
     apt update && apt install -y certbot python3-certbot-nginx
-    certbot --nginx -d $DOMAIN
+    certbot certonly --standalone -d $DOMAIN
 
     # Konfigurasi Nginx
     echo "Membuat konfigurasi Nginx..."
