@@ -22,7 +22,7 @@ install_phpmyadmin() {
     cat > /etc/nginx/sites-available/phpmyadmin.conf <<EOL
 server {
     listen 80;
-    server_name pabloprivate.servercloud.biz.id; # Domain Pterodactyl (misal: panel.example.com)
+    server_name pma.servercloud.biz.id; # Domain Pterodactyl (misal: panel.example.com)
 
     location $SUB_ROUTE {
         root /var/www/phpmyadmin;
