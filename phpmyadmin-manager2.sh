@@ -20,20 +20,12 @@ install_phpmyadmin() {
     # Instalasi Certbot dan sertifikat SSL
     echo "Menginstal Certbot dan mengatur SSL untuk domain..."
     systemctl stop nginx
-    apt update && apt install -y certbot python3-certbot-nginx
-    certbot certonly --standalone -d $DOMAIN
 
     # Konfigurasi Nginx
     echo "Membuat konfigurasi Nginx..."
     cat > /etc/nginx/sites-available/phpmyadmin.conf <<EOL
 server {
     listen 80;
-    server_name $DOMAIN;
-    return 301 https://\$server_name\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
     server_name $DOMAIN;
 
     root /var/www/phpmyadmin;
@@ -45,14 +37,8 @@ server {
 
     sendfile off;
 
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    ssl_session_cache shared:SSL:10m;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers 'ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256';
-    ssl_prefer_server_ciphers on;
-
+    # See https://hstspreload.org/ before uncommenting the line below.
+    # add_header Strict-Transport-Security "max-age=15768000; preload;";
     add_header X-Content-Type-Options nosniff;
     add_header X-XSS-Protection "1; mode=block";
     add_header X-Robots-Tag none;
@@ -61,16 +47,16 @@ server {
     add_header Referrer-Policy same-origin;
 
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+        try_files $uri $uri/ /index.php?$query_string;
     }
 
-    location ~ \.php\$ {
-        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_param HTTP_PROXY "";
         fastcgi_intercept_errors off;
         fastcgi_buffer_size 16k;
@@ -89,7 +75,7 @@ EOL
 
     # Mengaktifkan konfigurasi dan restart Nginx
     sudo ln -s /etc/nginx/sites-available/phpmyadmin.conf /etc/nginx/sites-enabled/phpmyadmin.conf
-    
+    systemctl start nginx
 
     # Membersihkan direktori config
     cp /var/www/phpmyadmin/config/config.inc.php /var/www/phpmyadmin
