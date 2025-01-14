@@ -110,9 +110,7 @@ uninstall_phpmyadmin() {
 
 # Menu utama
 echo "Pilih opsi:"
-#echo "1. Install phpMyAdmin"
-#echo "2. Uninstall phpMyAdmin"
-read -p "Masukkan pilihan (1/2): " CHOICE
+read -p "Pilih opsi: " CHOICE
 
 case $CHOICE in
     1)
